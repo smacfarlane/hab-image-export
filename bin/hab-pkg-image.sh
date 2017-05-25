@@ -54,12 +54,12 @@ find_system_commands() {
 
 build_image() {
   IMAGE_CONTEXT="$($_mktemp_cmd -t -d "${program}-XXXX")"
+  PKGS=($@)
   pushd $IMAGE_CONTEXT > /dev/null
-  PKGS=$@
-  env PKGS="$PKGS" NO_MOUNT=1 hab studio -r $IMAGE_CONTEXT -t bare new
-  IMAGE_NAME=${PKGS[0]//\//-}
+  PKG=${PKGS[0]}
+  IMAGE_NAME=${PKG//\//-}
   dd if=/dev/zero of="${IMAGE_NAME}" bs=1M count=2048
-  echo -e "n\n\n\n\n\nw" | fdisk $IMAGE_NAME
+  echo -e "n\n\n\n\n\nw" | fdisk "${IMAGE_NAME}"
 
   # -P flag *should* handle this for us, but for some reason doesn't create the partition devices.
   #  This is a workaround for that
@@ -70,6 +70,7 @@ build_image() {
   mkdir hab_image_root 
   mount $PART_LOOPDEV hab_image_root
   pushd hab_image_root
+  env PKGS="${PKGS[*]}" NO_MOUNT=1 hab studio -r $IMAGE_CONTEXT/hab_image_root -t bare new
   create_filesystem_layout
   copy_hab_stuff
   install_bootloader
@@ -77,7 +78,7 @@ build_image() {
 }
 
 package_name_with_version() {
-  local ident_file=$(find $IMAGE_CONTEXT/hab/pkgs/$1 -name IDENT)
+  local ident_file=$(find $IMAGE_CONTEXT/hab_image_root/hab/pkgs/$1 -name IDENT)
   cat $ident_file | awk 'BEGIN { FS = "/" }; { print $1 "-" $2 "-" $3 "-" $4 }'
 }
 
@@ -97,12 +98,20 @@ create_filesystem_layout() {
   hab pkg binlink core/bash bash -d ${PWD}/bin
   hab pkg binlink core/bash sh -d ${PWD}/bin
   hab pkg binlink core/busybox-static init -d ${PWD}/sbin
+  hab pkg binlink core/hab hab -d ${PWD}/bin
+
+  for pkg in ${PKGS[@]}; do 
+    echo "hab sup load ${pkg} --force" >> etc/init.d/startup
+  done
+  echo "hab sup run &" >> etc/init.d/startup
+  echo "hab sup bash" >> etc/init.d/startup
 }
 
 copy_hab_stuff() {
   mkdir -p hab
   cp -a /hab/pkgs hab/
   cp -a /hab/bin hab/
+  cp -a /hab/sup hab/
 }
 
 install_bootloader() {
@@ -135,10 +144,10 @@ program_files_path=$(dirname $0)/../files
 
 find_system_commands
 
-if [ -z "$@" ]; then
+if [[ -z "$@" ]]; then
   print_help
   exit_with "You must specify one or more Habitat packages to put in the image." 1
-elif [ "$@" == "--help" ]; then
+elif [[ "$@" == "--help" ]]; then
   print_help
 else
   build_image $@

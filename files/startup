@@ -42,6 +42,3 @@ echo $(/hab/bin/hab pkg exec core/busybox-static mdev) > /proc/sys/kernel/hotplu
 /hab/bin/hab pkg exec core/util-linux mount -a
 # make the root writable if this hasn't been done already
 /hab/bin/hab pkg exec core/util-linux mount -o remount,rw /
-
-/hab/bin/hab sup bash
-# end of /etc/init.d/startup
