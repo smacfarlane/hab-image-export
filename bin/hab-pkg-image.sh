@@ -76,7 +76,7 @@ create_filesystem_layout() {
 
   hab pkg binlink core/bash bash -d ${PWD}/bin
   hab pkg binlink core/bash sh -d ${PWD}/bin
-
+  hab pkg binlink core/busybox-static init -d ${PWD}/sbin
 }
 
 copy_hab_stuff() {
@@ -90,7 +90,7 @@ install_bootloader() {
   echo $PARTUUID
   cat <<EOB  > ${PWD}/boot/grub/grub.cfg 
 linux $(hab pkg path smacfarlane/linux)/boot/bzImage quiet root=/dev/sda1
-
+boot
 EOB
 
   grub-install --modules=part_msdos --boot-directory="${PWD}/boot" ${LOOPDEV} 
