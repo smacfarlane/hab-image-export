@@ -52,7 +52,7 @@ image() {
   PART_LOOPDEV=$(losetup -o 1048576 -f $IMAGE_NAME --show)
 
   mkfs.ext4 $PART_LOOPDEV
-  mkdir hab_image_root
+  mkdir hab_image_root 
   mount $PART_LOOPDEV hab_image_root
   pushd hab_image_root
   create_filesystem_layout
@@ -69,6 +69,14 @@ create_filesystem_layout() {
   install -d -m 0750 root 
   install -d -m 1777 tmp
   cp ${program_files_path}/{passwd,shadow,group,issue,profile,locale.sh,hosts,fstab} etc/
+  install -Dm755 ${program_files_path}/simple.script usr/share/udhcpc/default.script
+  install -Dm755 ${program_files_path}/startup etc/init.d/startup
+  install -Dm755 ${program_files_path}/inittab etc/inittab
+  install -Dm755 ${program_files_path}/udhcpc-run etc/rc.d/udhcpc/run
+
+  hab pkg binlink core/bash bash -d ${PWD}/bin
+  hab pkg binlink core/bash sh -d ${PWD}/bin
+
 }
 
 copy_hab_stuff() {
@@ -80,14 +88,12 @@ copy_hab_stuff() {
 install_bootloader() {
   PARTUUID=$(fdisk -l $IMAGE_CONTEXT/$IMAGE_NAME |grep "Disk identifier" |awk -F "0x" '{ print $2}')
   echo $PARTUUID
-  cat <<EOB  > ${PWD}/boot/grub/grub.cfg
-linux $(hab pkg path smacfarlane/linux)/boot/bzImage quiet init=$(hab pkg path core/bash)/bin/bash 
-boot
+  cat <<EOB  > ${PWD}/boot/grub/grub.cfg 
+linux $(hab pkg path smacfarlane/linux)/boot/bzImage quiet root=/dev/sda1
+
 EOB
 
-  cat boot/grub/grub.cfg
-
-  grub-install --boot-directory="${PWD}/boot" ${LOOPDEV} 
+  grub-install --modules=part_msdos --boot-directory="${PWD}/boot" ${LOOPDEV} 
 }
 
 cleanup() {

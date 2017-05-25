@@ -1,0 +1,10 @@
+# /etc/inittab
+::sysinit:/hab/bin/hab pkg exec core/coreutils echo STARTING SYSTEM
+::sysinit:/etc/init.d/startup
+tty1::respawn:/sbin/getty 38400 tty1
+tty2::respawn:/sbin/getty 38400 tty2
+tty3::respawn:/sbin/getty 38400 tty3
+::ctrlaltdel:/hab/bin/hab pkg exec core/util-linux umount -a -r
+::shutdown:/hab/bin/hab pkg exec core/coreutils echo SHUTTING DOWN
+::shutdown:/hab/bin/hab pkg exec core/util-linux umount -a -r
+# end of /etc/inittab

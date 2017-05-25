@@ -49,7 +49,7 @@ pkg_shasum="TODO"
 # An array of package dependencies needed at runtime. You can refer to packages
 # at three levels of specificity: `origin/package`, `origin/package/version`, or
 # `origin/package/version/release`.
-pkg_deps=(core/bash core/grep core/coreutils core/util-linux smacfarlane/grub smacfarlane/e2fsprogs core/hab core/gawk)
+pkg_deps=(core/bash core/grep core/coreutils core/util-linux core/grub core/e2fsprogs core/hab core/gawk core/iproute2 core/procps-ng)
 
 # Optional.
 # An array of the package dependencies needed only at build time.
