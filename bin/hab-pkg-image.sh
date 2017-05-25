@@ -1,6 +1,24 @@
 #!/bin/bash
 
 
+# If the variable `$DEBUG` is set, then print the shell commands as we execute.
+if [ -n "${DEBUG:-}" ]; then
+  set -x
+  export DEBUG
+fi
+
+# ## Help
+
+# **Internal** Prints help
+print_help() {
+  printf -- "$program $version
+$author
+Habitat Package Dockerize - Create a Docker container from a set of Habitat packages
+USAGE:
+  $program [PKG ..]
+"
+}
+
 # **Internal** Exit the program with an error message and a status code.
 #
 # ```sh
@@ -37,12 +55,9 @@ find_system_commands() {
 build_image() {
   IMAGE_CONTEXT="$($_mktemp_cmd -t -d "${program}-XXXX")"
   pushd $IMAGE_CONTEXT > /dev/null
-  image $@
-}
-
-
-image() {
-  IMAGE_NAME="hab_image"
+  PKGS=$@
+  env PKGS="$PKGS" NO_MOUNT=1 hab studio -r $IMAGE_CONTEXT -t bare new
+  IMAGE_NAME=${PKGS[0]//\//-}
   dd if=/dev/zero of="${IMAGE_NAME}" bs=1M count=2048
   echo -e "n\n\n\n\n\nw" | fdisk $IMAGE_NAME
 
@@ -59,6 +74,11 @@ image() {
   copy_hab_stuff
   install_bootloader
   copy_outside
+}
+
+package_name_with_version() {
+  local ident_file=$(find $IMAGE_CONTEXT/hab/pkgs/$1 -name IDENT)
+  cat $ident_file | awk 'BEGIN { FS = "/" }; { print $1 "-" $2 "-" $3 "-" $4 }'
 }
 
 create_filesystem_layout() {
@@ -80,7 +100,7 @@ create_filesystem_layout() {
 }
 
 copy_hab_stuff() {
-  mkdir -p hab 
+  mkdir -p hab
   cp -a /hab/pkgs hab/
   cp -a /hab/bin hab/
 }
@@ -89,7 +109,7 @@ install_bootloader() {
   PARTUUID=$(fdisk -l $IMAGE_CONTEXT/$IMAGE_NAME |grep "Disk identifier" |awk -F "0x" '{ print $2}')
   echo $PARTUUID
   cat <<EOB  > ${PWD}/boot/grub/grub.cfg 
-linux $(hab pkg path smacfarlane/linux)/boot/bzImage quiet root=/dev/sda1
+linux $(hab pkg path core/linux)/boot/bzImage quiet root=/dev/sda1
 boot
 EOB
 
@@ -106,7 +126,7 @@ cleanup() {
 
 copy_outside() {
   set -x
-  mv $IMAGE_CONTEXT/$IMAGE_NAME /src/results/$IMAGE_NAME-$(date +%Y%m%d%H%M%S)
+  mv $IMAGE_CONTEXT/$IMAGE_NAME /src/results/$(package_name_with_version ${PKGS[0]}).raw
   set +x
 }
 
@@ -115,6 +135,12 @@ program_files_path=$(dirname $0)/../files
 
 find_system_commands
 
-build_image
-
-cleanup
+if [ -z "$@" ]; then
+  print_help
+  exit_with "You must specify one or more Habitat packages to put in the image." 1
+elif [ "$@" == "--help" ]; then
+  print_help
+else
+  build_image $@
+  cleanup
+fi
