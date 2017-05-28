@@ -12,8 +12,7 @@ fi
 # **Internal** Prints help
 print_help() {
   printf -- "$program $version
-$author
-Habitat Package Dockerize - Create a Docker container from a set of Habitat packages
+Habitat Package Image - Create a bootable disk image from a set of Habitat packages
 USAGE:
   $program [PKG ..]
 "
