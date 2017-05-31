@@ -1,6 +1,7 @@
 #!/bin/bash
 
-
+KERNEL="core/linux"
+INIT=(core/iproute2 core/busybox-static core/util-linux core/coreutils)
 # If the variable `$DEBUG` is set, then print the shell commands as we execute.
 if [ -n "${DEBUG:-}" ]; then
   set -x
@@ -54,6 +55,7 @@ find_system_commands() {
 build_image() {
   IMAGE_CONTEXT="$($_mktemp_cmd -t -d "${program}-XXXX")"
   PKGS=($@)
+  IMAGE_PKGS=($@ $KERNEL ${INIT[*]})
   pushd $IMAGE_CONTEXT > /dev/null
   PKG=${PKGS[0]}
   IMAGE_NAME=${PKG//\//-}
@@ -69,9 +71,8 @@ build_image() {
   mkdir hab_image_root 
   mount $PART_LOOPDEV hab_image_root
   pushd hab_image_root
-  env PKGS="${PKGS[*]}" NO_MOUNT=1 hab studio -r $IMAGE_CONTEXT/hab_image_root -t bare new
+  env PKGS="${IMAGE_PKGS[*]}" NO_MOUNT=1 hab studio -r $IMAGE_CONTEXT/hab_image_root -t bare new
   create_filesystem_layout
-  copy_hab_stuff
   install_bootloader
   copy_outside
 }
@@ -92,10 +93,10 @@ create_filesystem_layout() {
   install -Dm755 ${program_files_path}/simple.script usr/share/udhcpc/default.script
   install -Dm755 ${program_files_path}/startup etc/init.d/startup
   install -Dm755 ${program_files_path}/inittab etc/inittab
-  install -Dm755 ${program_files_path}/udhcpc-run etc/rc.d/udhcpc/run
+  install -Dm755 ${program_files_path}/udhcpc-run etc/init.d/dhcpcd
 
-  hab pkg binlink core/bash bash -d ${PWD}/bin
-  hab pkg binlink core/bash sh -d ${PWD}/bin
+  hab pkg binlink core/busybox-static bash -d ${PWD}/bin
+  hab pkg binlink core/busybox-static sh -d ${PWD}/bin
   hab pkg binlink core/busybox-static init -d ${PWD}/sbin
   hab pkg binlink core/hab hab -d ${PWD}/bin
 
@@ -104,13 +105,6 @@ create_filesystem_layout() {
   done
   echo "hab sup run &" >> etc/init.d/startup
   echo "hab sup bash" >> etc/init.d/startup
-}
-
-copy_hab_stuff() {
-  mkdir -p hab
-  cp -a /hab/pkgs hab/
-  cp -a /hab/bin hab/
-  cp -a /hab/sup hab/
 }
 
 install_bootloader() {
@@ -133,9 +127,7 @@ cleanup() {
 }
 
 copy_outside() {
-  set -x
   mv $IMAGE_CONTEXT/$IMAGE_NAME /src/results/$(package_name_with_version ${PKGS[0]}).raw
-  set +x
 }
 
 program=$(basename $0)
