@@ -94,6 +94,7 @@ create_filesystem_layout() {
   install -Dm755 ${program_files_path}/startup etc/init.d/startup
   install -Dm755 ${program_files_path}/inittab etc/inittab
   install -Dm755 ${program_files_path}/udhcpc-run etc/init.d/dhcpcd
+  install -Dm755 ${program_files_path}/hab etc/init.d/hab
 
   hab pkg binlink core/busybox-static bash -d ${PWD}/bin
   hab pkg binlink core/busybox-static sh -d ${PWD}/bin
@@ -101,10 +102,10 @@ create_filesystem_layout() {
   hab pkg binlink core/hab hab -d ${PWD}/bin
 
   for pkg in ${PKGS[@]}; do 
-    echo "hab sup load ${pkg} --force" >> etc/init.d/startup
+    echo "hab sup load ${pkg} --force" >> etc/init.d/hab
   done
-  echo "hab sup run &" >> etc/init.d/startup
-  echo "hab sup bash" >> etc/init.d/startup
+  echo "hab sup run &" >> etc/init.d/hab
+  echo "hab sup bash" >> etc/init.d/hab
 }
 
 install_bootloader() {
