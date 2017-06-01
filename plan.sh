@@ -4,17 +4,14 @@ pkg_version="0.1.0"
 pkg_maintainer="The Habitat Maintainers <humans@habitat.sh>"
 pkg_license=('Apache-2.0')
 pkg_deps=(
-  core/bash
   core/grep
   core/coreutils
   core/util-linux
   core/grub
   core/e2fsprogs
   core/hab
-  core/hab-sup
   core/gawk
   core/findutils
-  core/iproute2
 )
 pkg_bin_dirs=(bin)
 
