@@ -51,9 +51,18 @@ find_system_commands() {
     fi
   fi
 }
+# **Internal** Find the internal path for a package
+#
+# ```
+# _pkgpath_for "core/redis"
+# ```
+_pkgpath_for() {
+  hab pkg path $1 | $bb sed -e "s,^$IMAGE_ROOT,,g"
+}
 
 build_image() {
   IMAGE_CONTEXT="$($_mktemp_cmd -t -d "${program}-XXXX")"
+  IMAGE_ROOT="${IMAGE_CONTEXT}/hab_image_root"
   PKGS=($@)
   IMAGE_PKGS=($@ $KERNEL ${INIT[*]})
   pushd $IMAGE_CONTEXT > /dev/null
@@ -71,14 +80,14 @@ build_image() {
   mkdir hab_image_root 
   mount $PART_LOOPDEV hab_image_root
   pushd hab_image_root
-  env PKGS="${IMAGE_PKGS[*]}" NO_MOUNT=1 hab studio -r $IMAGE_CONTEXT/hab_image_root -t bare new
+  env PKGS="${IMAGE_PKGS[*]}" NO_MOUNT=1 hab studio -r $IMAGE_ROOT -t bare new
   create_filesystem_layout
   install_bootloader
   copy_outside
 }
 
 package_name_with_version() {
-  local ident_file=$(find $IMAGE_CONTEXT/hab_image_root/hab/pkgs/$1 -name IDENT)
+  local ident_file=$(find $IMAGE_ROOT/hab/pkgs/$1 -name IDENT)
   cat $ident_file | awk 'BEGIN { FS = "/" }; { print $1 "-" $2 "-" $3 "-" $4 }'
 }
 
@@ -93,19 +102,33 @@ create_filesystem_layout() {
   install -Dm755 ${program_files_path}/simple.script usr/share/udhcpc/default.script
   install -Dm755 ${program_files_path}/startup etc/init.d/startup
   install -Dm755 ${program_files_path}/inittab etc/inittab
-  install -Dm755 ${program_files_path}/udhcpc-run etc/init.d/dhcpcd
-  install -Dm755 ${program_files_path}/hab etc/init.d/hab
+  install -Dm755 ${program_files_path}/udhcpc-run etc/rc.d/dhcpcd
+  install -Dm755 ${program_files_path}/hab etc/rc.d/hab
 
   hab pkg binlink core/busybox-static bash -d ${PWD}/bin
+  hab pkg binlink core/busybox-static login -d ${PWD}/bin
   hab pkg binlink core/busybox-static sh -d ${PWD}/bin
   hab pkg binlink core/busybox-static init -d ${PWD}/sbin
   hab pkg binlink core/hab hab -d ${PWD}/bin
 
-  for pkg in ${PKGS[@]}; do 
-    echo "hab sup load ${pkg} --force" >> etc/init.d/hab
+  local _profile_path=""
+  for pkg in ${IMAGE_PKGS[@]}; do 
+    local _pkgpath_file="$(_pkgpath_for $pkg)/PATH"
+    if [[ -f "${_pkgpath_file#/}" ]]; then
+      if [[ -z "${_profile_path}" ]]; then
+        _profile_path="$(cat ${_pkgpath_file})"
+      else
+        _profile_path="${_profile_path}:$(cat ${_pkgpath_file})"
+      fi 
+    fi
   done
-  echo "hab sup run &" >> etc/init.d/hab
-  echo "hab sup bash" >> etc/init.d/hab
+  
+  echo "export PATH=\${PATH}:${_profile_path}" >> etc/profile
+
+  for pkg in ${PKGS[@]}; do 
+    echo "hab sup load ${pkg} --force" >> etc/rc.d/hab
+  done
+  echo "hab sup run &" >> etc/rc.d/hab
 }
 
 install_bootloader() {
@@ -121,7 +144,7 @@ EOB
 
 cleanup() {
   popd >/dev/null
-  umount $IMAGE_CONTEXT/hab_image_root
+  umount $IMAGE_ROOT
   rm -rf $IMAGE_CONTEXT
   losetup -d $LOOPDEV
   losetup -d $PART_LOOPDEV
@@ -145,3 +168,4 @@ else
   build_image $@
   cleanup
 fi
+

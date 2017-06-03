@@ -11,6 +11,7 @@ pkg_deps=(
   core/e2fsprogs
   core/hab
   core/gawk
+  core/sed
   core/findutils
 )
 pkg_bin_dirs=(bin)
