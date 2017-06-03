@@ -1,7 +1,8 @@
 # /etc/inittab
 ::sysinit:/hab/bin/hab pkg exec core/coreutils echo STARTING SYSTEM
 ::sysinit:/etc/init.d/startup
-::sysinit:/etc/init.d/hab
+:3:initdefault:
+:3:respawn:/hab/bin/hab pkg exec core/busybox-static runsvdir /etc/rc.d
 tty1::respawn:/hab/bin/hab pkg exec core/busybox-static getty 38400 tty1
 tty2::respawn:/hab/bin/hab pkg exec core/busybox-static getty 38400 tty2
 tty3::respawn:/hab/bin/hab pkg exec core/busybox-static getty 38400 tty3
