@@ -86,9 +86,27 @@ n
 
 w
 EOF
-  #echo -e "n\n\n\n\n\nw" | fdisk "${image_name}"
 }
 
+# 
+# Create a new temporary workspace and make that our CWD
+# Create a file of $SIZE that will be the basis of our image
+#   Partition the file
+#   Mount the file, and its partition as loopback devices
+#   Add a filesystem to the partition 
+#   Create a mountpoint for it in the CWD
+#   Mount the partition to that directory and make that our new CWD
+#     This will be / in our resulting image
+#
+# The resulting directory tree will look like this:
+#   
+# ├── $IMAGE_CONTEXT/      # <-- Our workspace root
+# │   ├── hab-raw-image    # <-- This is the "raw image" that will be exported
+# │   ├── hab-image-root   # <-- This is the mountpoint for the above partition
+#                                and is / for the resulting image.
+# │   │   ├── bin             
+# │   │   ├── etc           
+# .....
 
 raw_image() {
   IMAGE_CONTEXT="$($_mktemp_cmd -t -d "${program}-XXXX")"
