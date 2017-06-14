@@ -143,41 +143,55 @@ create_filesystem_layout() {
   install -Dm755 ${program_files_path}/simple.script usr/share/udhcpc/default.script
   install -Dm755 ${program_files_path}/startup etc/init.d/startup
   install -Dm755 ${program_files_path}/inittab etc/inittab
-  install -Dm755 ${program_files_path}/udhcpc-run etc/rc.d/dhcpcd
-  install -Dm755 ${program_files_path}/hab etc/rc.d/hab
-
   hab pkg binlink core/busybox-static bash -d ${PWD}/bin
   hab pkg binlink core/busybox-static login -d ${PWD}/bin
   hab pkg binlink core/busybox-static sh -d ${PWD}/bin
   hab pkg binlink core/busybox-static init -d ${PWD}/sbin
   hab pkg binlink core/hab hab -d ${PWD}/bin
 
-  add_packages_to_path ${INIT[@]}
+  add_packages_to_path ${SYSTEM[@]}
+  setup_init
+}
+
+setup_init() {
+  install -d -m 0755 etc/rc.d/dhcpcd 
+  install -d -m 0755 etc/rc.d/hab
+  install -Dm755 ${program_files_path}/udhcpc-run etc/rc.d/dhcpcd/run
+  install -Dm755 ${program_files_path}/hab etc/rc.d/hab/run
 
   for pkg in ${PKGS[@]}; do 
-    echo "hab sup load ${pkg} --force" >> etc/rc.d/hab
+    echo "/bin/hab sup load ${pkg} --force" >> etc/rc.d/hab/run
   done
-  echo "hab sup run &" >> etc/rc.d/hab
+  echo "/bin/hab sup run " >> etc/rc.d/hab/run
+}
+
+add_package_to_path() {
+  local _pkg=$1
+
+  if [[ -f "${_pkg}/PATH" ]]; then
+    local _path=$(cat "${_pkg}/PATH")
+    echo "PATH=\${PATH}:${_path}" >> etc/profile.d/hab_path.sh 
+  fi
 }
 
 add_packages_to_path() {
   local _pkgs=($@)
-  local _profile_path=""
-
-  for pkg in ${_pkgs[@]}; do 
-    local _pkgpath_file="$(_pkgpath_for $pkg)/PATH"
-    if [[ -f "${_pkgpath_file#/}" ]]; then
-      if [[ -z "${_profile_path}" ]]; then
-        _profile_path="$(cat ${_pkgpath_file})"
-      else
-        _profile_path="${_profile_path}:$(cat ${_pkgpath_file})"
-      fi 
-    fi
-  done
   
   mkdir -p etc/profile.d
 
-  echo "export PATH=\${PATH}:${_profile_path}" >> etc/profile.d/hab_path.sh
+  for pkg in ${_pkgs[@]}; do 
+    local _pkgpath=$(_pkgpath_for $pkg)
+    add_package_to_path $_pkgpath
+    
+    if [[ -f "${_pkgpath}/TDEPS" ]]; then 
+      for dep in $(cat "${_pkgpath}/TDEPS"); do
+        local _deppath=$(_pkgpath_for $dep)
+        add_package_to_path $_deppath
+      done
+    fi
+  done
+  
+  echo "export PATH" >> etc/profile.d/hab_path.sh
 }
 
 install_bootloader() {
@@ -198,10 +212,12 @@ program_files_path=$(dirname $0)/../files
 find_system_commands
 
 KERNEL="core/linux"
-INIT=(core/iproute2 core/busybox-static core/util-linux core/coreutils)
+SYSTEM="core/hab-image-system"
+BOOT="core/grub"
 PKGS=($@)
+
 IMAGE_NAME="${1//\//-}"  # Turns core/redis into core-redis
-IMAGE_PKGS=($@ $KERNEL ${INIT[*]})
+IMAGE_PKGS=($@ $KERNEL ${SYSTEM} ${BOOT})
 
 if [[ -z "$@" ]]; then
   print_help
