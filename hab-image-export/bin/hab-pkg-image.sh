@@ -199,7 +199,7 @@ install_bootloader() {
   # PARTUUID=$(fdisk -l $IMAGE_CONTEXT/$IMAGE_NAME |grep "Disk identifier" |awk -F "0x" '{ print $2}')
   # echo $PARTUUID
   cat <<EOB  > ${PWD}/boot/grub/grub.cfg 
-linux $(hab pkg path ${KERNEL})/boot/bzImage quiet root=/dev/sda1
+linux $(_pkgpath_for ${KERNEL})/boot/bzImage quiet root=/dev/sda1
 boot
 EOB
 
@@ -226,8 +226,7 @@ elif [[ "$@" == "--help" ]]; then
   print_help
 else
 
-  # Stopgap for testing as we clean this up.
-
+  # The method for generating relative paths currently requires the package to be installed in the studio
   for pkg in ${IMAGE_PKGS[@]}; do 
     hab pkg install "${pkg}"
   done 
