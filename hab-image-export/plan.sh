@@ -22,5 +22,5 @@ do_build() {
 
 do_install() {
   install -vD "${PLAN_CONTEXT}/bin/${pkg_name}.sh" "${pkg_prefix}/bin/${pkg_name}"
-  cp -rv "${PLAN_CONTEXT}/files" "${pkg_prefix}/"
+  # cp -rv "${PLAN_CONTEXT}/files" "${pkg_prefix}/"
 }

@@ -8,14 +8,15 @@ pkg_deps=(
   core/busybox-static
   core/util-linux
   core/coreutils
+  core/hab
 )
+pkg_bin_dirs=(bin)
 
 do_build() {
   return 0
 }
 
 do_install() {
-  return 0
-  install -vD "${PLAN_CONTEXT}/bin/${pkg_name}.sh" "${pkg_prefix}/bin/${pkg_name}"
+  install -vD "${PLAN_CONTEXT}/bin/setup.sh" "${pkg_prefix}/bin/setup.sh"
   cp -rv "${PLAN_CONTEXT}/files" "${pkg_prefix}/"
 }
