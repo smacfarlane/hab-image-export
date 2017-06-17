@@ -107,7 +107,7 @@ create_raw_image() {
   pushd "${_image_rootfs_dir}"
  
   env PKGS="${IMAGE_PKGS[*]}" NO_MOUNT=1 hab studio -r "${PWD}" -t bare new
-  hab pkg exec $SYSTEM setup.sh "${IMAGE_PKGS[*]}"
+  hab pkg exec $SYSTEM setup.sh "${PKGS[*]}"
   install_bootloader "${_loopback_dev}"
 
   popd

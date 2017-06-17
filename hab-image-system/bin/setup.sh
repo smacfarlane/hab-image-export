@@ -27,7 +27,7 @@ create_filesystem_layout() {
   hab pkg binlink core/busybox-static init -d ${PWD}/sbin
   hab pkg binlink core/hab hab -d ${PWD}/bin
 
-  add_packages_to_path ${PACKAGES[@]}
+  add_packages_to_path
   setup_init
 }
 
@@ -37,7 +37,7 @@ setup_init() {
   install -Dm755 ${program_files_path}/udhcpc-run etc/rc.d/dhcpcd/run
   install -Dm755 ${program_files_path}/hab etc/rc.d/hab/run
 
-  for pkg in ${PKGS[@]}; do 
+  for pkg in ${PACKAGES[@]}; do 
     echo "/bin/hab sup load ${pkg} --force" >> etc/rc.d/hab/run
   done
   echo "/bin/hab sup run " >> etc/rc.d/hab/run
@@ -53,21 +53,16 @@ add_package_to_path() {
 }
 
 add_packages_to_path() {
-  local _pkgs=($@)
+  local _pkgpath=$(dirname $0)/..
   
   mkdir -p etc/profile.d
-
-  for pkg in ${_pkgs[@]}; do 
-    local _pkgpath=$(_pkgpath_for $pkg)
-    add_package_to_path $_pkgpath
     
-    if [[ -f "${_pkgpath}/TDEPS" ]]; then 
-      for dep in $(cat "${_pkgpath}/TDEPS"); do
-        local _deppath=$(_pkgpath_for $dep)
-        add_package_to_path $_deppath
-      done
-    fi
-  done
+  if [[ -f "${_pkgpath}/TDEPS" ]]; then 
+    for dep in $(cat "${_pkgpath}/TDEPS"); do
+      local _deppath=$(_pkgpath_for $dep)
+      add_package_to_path $_deppath
+    done
+  fi
   
   echo "export PATH" >> etc/profile.d/hab_path.sh
 }
