@@ -50,15 +50,6 @@ find_system_commands() {
   fi
 }
 
-# **Internal** Find the internal path for a package
-#
-# ```
-# _pkgpath_for "core/redis"
-# ```
-_pkgpath_for() {
-  hab pkg path $1 | $bb sed -e "s,^$IMAGE_ROOT_FULLPATH,,g"
-}
-
 # Return the name of a package including version with - seperators
 #
 # ```
@@ -115,7 +106,8 @@ create_raw_image() {
   mount "${_partition_loopback_dev}" "${_image_rootfs_dir}"
   pushd "${_image_rootfs_dir}"
  
-  populate_image
+  env PKGS="${IMAGE_PKGS[*]}" NO_MOUNT=1 hab studio -r "${PWD}" -t bare new
+  hab pkg exec $SYSTEM setup.sh "${PKGS[*]}"
   install_bootloader "${_loopback_dev}"
 
   popd
@@ -124,60 +116,6 @@ create_raw_image() {
   losetup -d "${_partition_loopback_dev}"
 
   mv ${_image_name} /src/results/$(package_name_with_version ${PKGS[0]}).raw
-}
-
-populate_image() {
-  env PKGS="${IMAGE_PKGS[*]}" NO_MOUNT=1 hab studio -r "${PWD}" -t bare new
-
-  create_filesystem_layout
-}
-
-create_filesystem_layout() {
-  mkdir -p {bin,sbin,boot,dev,etc,home,lib,mnt,opt,proc,srv,sys}
-  mkdir -p boot/grub
-  mkdir -p usr/{sbin,bin,include,lib,share,src}
-  mkdir -p var/{lib,lock,log,run,spool}
-  install -d -m 0750 root 
-  install -d -m 1777 tmp
-  cp ${program_files_path}/{passwd,shadow,group,issue,profile,locale.sh,hosts,fstab} etc/
-  install -Dm755 ${program_files_path}/simple.script usr/share/udhcpc/default.script
-  install -Dm755 ${program_files_path}/startup etc/init.d/startup
-  install -Dm755 ${program_files_path}/inittab etc/inittab
-  install -Dm755 ${program_files_path}/udhcpc-run etc/rc.d/dhcpcd
-  install -Dm755 ${program_files_path}/hab etc/rc.d/hab
-
-  hab pkg binlink core/busybox-static bash -d ${PWD}/bin
-  hab pkg binlink core/busybox-static login -d ${PWD}/bin
-  hab pkg binlink core/busybox-static sh -d ${PWD}/bin
-  hab pkg binlink core/busybox-static init -d ${PWD}/sbin
-  hab pkg binlink core/hab hab -d ${PWD}/bin
-
-  add_packages_to_path ${INIT[@]}
-
-  for pkg in ${PKGS[@]}; do 
-    echo "hab sup load ${pkg} --force" >> etc/rc.d/hab
-  done
-  echo "hab sup run &" >> etc/rc.d/hab
-}
-
-add_packages_to_path() {
-  local _pkgs=($@)
-  local _profile_path=""
-
-  for pkg in ${_pkgs[@]}; do 
-    local _pkgpath_file="$(_pkgpath_for $pkg)/PATH"
-    if [[ -f "${_pkgpath_file#/}" ]]; then
-      if [[ -z "${_profile_path}" ]]; then
-        _profile_path="$(cat ${_pkgpath_file})"
-      else
-        _profile_path="${_profile_path}:$(cat ${_pkgpath_file})"
-      fi 
-    fi
-  done
-  
-  mkdir -p etc/profile.d
-
-  echo "export PATH=\${PATH}:${_profile_path}" >> etc/profile.d/hab_path.sh
 }
 
 install_bootloader() {
@@ -193,15 +131,16 @@ EOB
 }
 
 program=$(basename $0)
-program_files_path=$(dirname $0)/../files
 
 find_system_commands
 
 KERNEL="core/linux"
-INIT=(core/iproute2 core/busybox-static core/util-linux core/coreutils)
+SYSTEM="core/hab-image-system"
+BOOT="core/grub"
 PKGS=($@)
+
 IMAGE_NAME="${1//\//-}"  # Turns core/redis into core-redis
-IMAGE_PKGS=($@ $KERNEL ${INIT[*]})
+IMAGE_PKGS=($@ $KERNEL ${SYSTEM} ${BOOT})
 
 if [[ -z "$@" ]]; then
   print_help
@@ -210,8 +149,7 @@ elif [[ "$@" == "--help" ]]; then
   print_help
 else
 
-  # Stopgap for testing as we clean this up.
-
+  # The method for generating relative paths currently requires the package to be installed in the studio
   for pkg in ${IMAGE_PKGS[@]}; do 
     hab pkg install "${pkg}"
   done 

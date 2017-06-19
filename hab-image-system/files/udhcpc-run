@@ -1,0 +1,3 @@
+#!/bin/sh
+
+/hab/bin/hab pkg exec core/busybox-static udhcpc -f -R
