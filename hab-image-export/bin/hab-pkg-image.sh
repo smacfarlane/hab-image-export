@@ -68,7 +68,7 @@ package_name_with_version() {
 # ```
 create_and_partition_raw_image() {
   local image_name="${1}"
-  dd if=/dev/zero of="${image_name}" bs=1M count=2048
+  dd if=/dev/zero of="${image_name}" bs=1M count="${HAB_IMAGE_SIZE}"
   cat <<EOF | fdisk "${image_name}"
 n
 
@@ -107,7 +107,7 @@ create_raw_image() {
   pushd "${_image_rootfs_dir}"
  
   env PKGS="${IMAGE_PKGS[*]}" NO_MOUNT=1 hab studio -r "${PWD}" -t bare new
-  hab pkg exec $SYSTEM setup.sh "${PKGS[*]}"
+  hab pkg exec "${HAB_SYSTEM}" setup.sh "${PKGS[*]}"
   install_bootloader "${_loopback_dev}"
 
   popd
@@ -123,7 +123,7 @@ install_bootloader() {
   # PARTUUID=$(fdisk -l $IMAGE_CONTEXT/$IMAGE_NAME |grep "Disk identifier" |awk -F "0x" '{ print $2}')
   # echo $PARTUUID
   cat <<EOB  > ${PWD}/boot/grub/grub.cfg 
-linux $(hab pkg path ${KERNEL})/boot/bzImage quiet root=/dev/sda1
+linux $(hab pkg path ${HAB_KERNEL})/boot/bzImage quiet root=/dev/sda1
 boot
 EOB
 
@@ -134,13 +134,14 @@ program=$(basename $0)
 
 find_system_commands
 
-KERNEL="core/linux"
-SYSTEM="core/hab-image-system"
-BOOT="core/grub"
+HAB_KERNEL="${HAB_KERNEL:-core/linux}"
+HAB_SYSTEM="${HAB_SYSTEM:-core/hab-image-system}"
+HAB_BOOT="${HAB_BOOT:-core/grub}"
+HAB_IMAGE_SIZE="${HAB_IMAGE_SIZE:-512}"
 PKGS=($@)
 
 IMAGE_NAME="${1//\//-}"  # Turns core/redis into core-redis
-IMAGE_PKGS=($@ $KERNEL ${SYSTEM} ${BOOT})
+IMAGE_PKGS=($@ $HAB_KERNEL ${HAB_SYSTEM} ${HAB_BOOT})
 
 if [[ -z "$@" ]]; then
   print_help
