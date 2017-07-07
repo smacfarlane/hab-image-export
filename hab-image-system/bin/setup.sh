@@ -27,7 +27,7 @@ create_filesystem_layout() {
   hab pkg binlink core/busybox-static init -d ${PWD}/sbin
   hab pkg binlink core/hab hab -d ${PWD}/bin
 
-  add_packages_to_path
+  link_bins
   setup_init
 }
 
@@ -43,28 +43,30 @@ setup_init() {
   echo "/bin/hab sup run " >> etc/rc.d/hab/run
 }
 
-add_package_to_path() {
+link_bins_for() {
   local _pkg=$1
 
-  if [[ -f "${_pkg}/PATH" ]]; then
-    local _path=$(cat "${_pkg}/PATH")
-    echo "PATH=\${PATH}:${_path}" >> etc/profile.d/hab_path.sh 
+  if [[ -f "${_pkg}/PATH" && -f "${_pkg}/IDENT" ]]; then
+    for path in $(cat "${_pkg}/PATH"| tr ":" "\n"); do  
+      local bindir=$(basename $path);
+      local ident=$(cat ${_pkg}/IDENT)
+      mkdir -p /usr/${bindir} 
+      for bin in $path/*; do 
+        hab pkg binlink $ident "$(basename $bin)" -d ${PWD}/usr/"${bindir}" 
+      done
+    done
   fi
 }
 
-add_packages_to_path() {
+link_bins() {
   local _pkgpath=$(dirname $0)/..
   
-  mkdir -p etc/profile.d
-    
   if [[ -f "${_pkgpath}/TDEPS" ]]; then 
     for dep in $(cat "${_pkgpath}/TDEPS"); do
       local _deppath=$(_pkgpath_for $dep)
-      add_package_to_path $_deppath
+      link_bins_for $_deppath
     done
   fi
-  
-  echo "export PATH" >> etc/profile.d/hab_path.sh
 }
 
 PACKAGES=($@)
