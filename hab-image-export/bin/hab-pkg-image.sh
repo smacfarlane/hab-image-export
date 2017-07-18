@@ -77,7 +77,6 @@ n
 
 w
 EOF
-  #echo -e "n\n\n\n\n\nw" | fdisk "${image_name}"
 }
 
 
@@ -122,8 +121,10 @@ install_bootloader() {
   local _device="${1}"
   # PARTUUID=$(fdisk -l $IMAGE_CONTEXT/$IMAGE_NAME |grep "Disk identifier" |awk -F "0x" '{ print $2}')
   # echo $PARTUUID
+  #  NOTE:  The below line allows you to get terminal output when using qemu-system-x86_64 -serial stdio <image>
+  #  linux $(hab pkg path ${HAB_KERNEL})/boot/bzImage quiet root=/dev/sda1 rw console=ttyAMA0  console=ttyS0
   cat <<EOB  > ${PWD}/boot/grub/grub.cfg 
-linux $(hab pkg path ${HAB_KERNEL})/boot/bzImage quiet root=/dev/sda1
+linux $(hab pkg path ${HAB_KERNEL})/boot/bzImage quiet root=/dev/sda1 rw 
 boot
 EOB
 

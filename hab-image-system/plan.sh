@@ -9,6 +9,9 @@ pkg_deps=(
   core/util-linux
   core/coreutils
   core/hab
+  core/hab-launcher
+  core/hab-sup
+  core/eudev
 )
 pkg_bin_dirs=(bin)
 
