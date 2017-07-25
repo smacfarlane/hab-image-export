@@ -1,0 +1,21 @@
+export_pkg() {
+  local _pkgs="${@}"
+  hab pkg exec $HAB_ORIGIN/hab-pkg-image hab-pkg-image "${_pkgs[*]}"
+}
+
+rebuild_all() {
+  build hab-image-export
+  build hab-image-system
+}
+
+to_vmdk() {
+  local _src_image=$1
+  local _dst_image="${_src_image%raw}vmdk"
+
+  hab pkg exec core/qemu qemu-img convert "${_src_image}" -O vmdk "${_dst_image}"
+  echo "${_dst_image}"
+}
+
+
+hab pkg install core/qemu
+
