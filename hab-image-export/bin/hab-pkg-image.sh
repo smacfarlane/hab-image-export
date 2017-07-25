@@ -136,7 +136,7 @@ program=$(basename $0)
 find_system_commands
 
 HAB_KERNEL="${HAB_KERNEL:-core/linux}"
-HAB_SYSTEM="${HAB_SYSTEM:-core/hab-image-system}"
+HAB_SYSTEM="${HAB_SYSTEM:-${HAB_ORIGIN}/hab-image-system}"
 HAB_BOOT="${HAB_BOOT:-core/grub}"
 HAB_IMAGE_SIZE="${HAB_IMAGE_SIZE:-512}"
 PKGS=($@)
