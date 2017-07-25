@@ -1,4 +1,4 @@
-export_pkg() {
+export_raw() {
   local _pkgs="${@}"
   hab pkg exec $HAB_ORIGIN/hab-pkg-image hab-pkg-image "${_pkgs[*]}"
 }
@@ -8,14 +8,18 @@ rebuild_all() {
   build hab-image-system
 }
 
-to_vmdk() {
+export_vdmk() {
   local _src_image=$1
   local _dst_image="${_src_image%raw}vmdk"
 
-  hab pkg exec core/qemu qemu-img convert "${_src_image}" -O vmdk "${_dst_image}"
-  echo "${_dst_image}"
-}
+  export_raw "${@}"
+  result=$?
 
+  if [[ $result -eq 0 ]]; then
+    hab pkg exec core/qemu qemu-img convert "${_src_image}" -O vmdk "${_dst_image}"
+    echo "${_dst_image}"
+  fi
+}
 
 hab pkg install core/qemu
 
