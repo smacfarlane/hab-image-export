@@ -8,14 +8,14 @@ rebuild_all() {
   build hab-image-system
 }
 
-export_vdmk() {
-  local _src_image=$1
-  local _dst_image="${_src_image%raw}vmdk"
-
+export_vmdk() {
   export_raw "${@}"
   result=$?
 
   if [[ $result -eq 0 ]]; then
+    local _src_image=$(ls results/${1//\//-}*.raw -1 | tail -n1)
+    local _dst_image="${_src_image%raw}vmdk"
+
     hab pkg exec core/qemu qemu-img convert "${_src_image}" -O vmdk "${_dst_image}"
     echo "${_dst_image}"
   fi
