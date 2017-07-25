@@ -28,7 +28,6 @@ create_filesystem_layout() {
   hab pkg binlink core/hab hab -d ${PWD}/bin
 
   link_bins
-  setup_init
   setup_root_ssh # TODO: Temporary hack, remove me
 
   install -Dm744 ${program_files_path}/init ${PWD}/sbin/
@@ -40,18 +39,6 @@ setup_root_ssh() {
   if [[ -f ${program_files_path}/authorized_keys ]]; then
     install -m 0600 ${program_files_path}/authorized_keys root/.ssh/authorized_keys
   fi
-}
-
-setup_init() {
-  install -d -m 0755 etc/rc.d/dhcpcd 
-  install -d -m 0755 etc/rc.d/hab
-  install -Dm755 ${program_files_path}/udhcpc-run etc/rc.d/dhcpcd/run
-  install -Dm755 ${program_files_path}/hab etc/rc.d/hab/run
-
-  for pkg in ${PACKAGES[@]}; do 
-    echo "/bin/hab sup load ${pkg} --force" >> etc/rc.d/hab/run
-  done
-  echo "/bin/hab sup run " >> etc/rc.d/hab/run
 }
 
 link_bins_for() {
@@ -90,4 +77,3 @@ PACKAGES=($@)
 program_files_path=$(dirname $0)/../files
 
 create_filesystem_layout
-setup_init
