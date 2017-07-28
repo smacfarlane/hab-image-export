@@ -17,6 +17,7 @@ else
   mount -n -t devpts   devpts   /dev/pts
   mount -a
   /usr/bin/busybox udhcpc
+  sleep 5
   hab sup load core/openssh
   exec hab sup run
 fi
