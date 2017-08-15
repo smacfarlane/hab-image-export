@@ -1,0 +1,17 @@
+!/bin/sh
+
+exec 2>&1
+
+mkdir -p {{pkg.svc_var_path}}/run
+mkdir -p {{pkg.svc_var_path}}/db
+mkdir -p {{pkg.svc_var_path}}/etc
+
+
+if [[ -f /tmp/dhclient.pid ]]; then
+  cp -a /tmp/dhclient.pid {{pkg.svc_var_path}}/run/dhclient.pid
+fi
+
+if [[ -f /tmp/dhclient.leases ]]; then 
+  cp -a /tmp/dhclient.leases {{pkg.svc_var_path}}/db/dhclient.leases
+fi
+
