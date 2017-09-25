@@ -4,6 +4,7 @@ export_raw() {
 }
 
 rebuild_all() {
+  build hab-mkinitramfs
   build hab-image-export
   build hab-image-system
 }
@@ -19,6 +20,12 @@ export_vmdk() {
     hab pkg exec core/qemu qemu-img convert "${_src_image}" -O vmdk "${_dst_image}"
     echo "${_dst_image}"
   fi
+}
+
+cleanup_mounts() {
+  umount /tmp/hab-pkg-image*/hab-image-root
+  losetup -D
+  rm -rf /tmp/hab-pkg-image*
 }
 
 hab pkg install core/qemu
