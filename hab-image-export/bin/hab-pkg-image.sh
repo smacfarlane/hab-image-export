@@ -148,7 +148,7 @@ install_bootloader() {
   #  NOTE:  The below line allows you to get terminal output when using qemu-system-x86_64 -serial stdio <image>
   #  linux $(hab pkg path ${HAB_KERNEL})/boot/bzImage quiet root=/dev/sda1 rw console=ttyAMA0  console=ttyS0
   cat <<EOB  > ${PWD}/boot/grub/grub.cfg 
-linux $(hab pkg path ${HAB_KERNEL})/boot/bzImage quiet root=UUID=$PARTUUID rw console=ttyAMA0 console=ttyS0
+linux $(hab pkg path ${HAB_KERNEL})/boot/bzImage quiet root=UUID=$PARTUUID rw
 initrd /boot/initrd.img-$(kernel_version $HAB_KERNEL)
 boot
 EOB
