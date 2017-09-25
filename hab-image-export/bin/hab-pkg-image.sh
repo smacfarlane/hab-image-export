@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Fail if there are any unset variables and whenever a command returns a 
+# non-zero exit code.
+#set -eu
+
 # If the variable `$DEBUG` is set, then print the shell commands as we execute.
 if [ -n "${DEBUG:-}" ]; then
   set -x
@@ -61,6 +65,11 @@ package_name_with_version() {
   cat $ident_file | awk 'BEGIN { FS = "/" }; { print $1 "-" $2 "-" $3 "-" $4 }'
 }
 
+# Return the version of the Kernel package
+kernel_version() {
+  package_name_with_version $1 | awk -F '-' '{print $3}' 
+}
+
 # Creates a file to be used as the disk image with a single full-disk partition
 #
 # ```
@@ -79,16 +88,17 @@ w
 EOF
 }
 
-
 raw_image() {
   IMAGE_CONTEXT="$($_mktemp_cmd -t -d "${program}-XXXX")"
-  pushd $IMAGE_CONTEXT  
+  pushd $IMAGE_CONTEXT > /dev/null
   create_raw_image
-  popd 
+  popd  > /dev/null
   rm -rf "${IMAGE_CONTEXT}"
 }
 
 create_raw_image() {
+  local kernel_path kernel_ident kernel_version
+
   local _image_name="hab-raw-image"
   local _image_rootfs_dir="hab-image-root"
 
@@ -103,13 +113,27 @@ create_raw_image() {
   mkfs.ext4 "${_partition_loopback_dev}"
   mkdir "${_image_rootfs_dir}"
   mount "${_partition_loopback_dev}" "${_image_rootfs_dir}"
-  pushd "${_image_rootfs_dir}"
+  pushd "${_image_rootfs_dir}" > /dev/null
  
+  # TODO:  hab studio does some things I think we don't want
+  #        pull in the pkg install functionality and handle it here
   env PKGS="${IMAGE_PKGS[*]}" NO_MOUNT=1 hab studio -r "${PWD}" -t bare new
   hab pkg exec "${HAB_SYSTEM}" setup.sh "${PKGS[*]}"
-  install_bootloader "${_loopback_dev}"
 
-  popd
+  hab-mkinitramfs "${HAB_KERNEL}" "${IMAGE_ROOT_FULLPATH}/boot"
+
+  install_bootloader "${_loopback_dev}" "${_partition_loopback_dev}"
+  kernel_path="$(hab pkg path ${HAB_KERNEL})"
+  kernel_ident="${kernel_path}/IDENT"
+  if [[ -f "${kernel_ident}" ]]; then 
+    kernel_version=$(cat "${kernel_ident}" | awk -F '/' '{print $3}')
+    mkdir -p lib/modules
+    ln -s "${kernel_path}/lib/modules/${kernel_version}" "lib/modules/${kernel_version}"
+    # TODO: How do we ensure kmod is in our path before busybox? 
+    hab pkg exec smacfarlane/kmod depmod -b ${IMAGE_ROOT_FULLPATH} "${kernel_version}"
+  fi
+
+  popd > /dev/null
   umount "${_image_rootfs_dir}"
   losetup -d "${_loopback_dev}"
   losetup -d "${_partition_loopback_dev}"
@@ -119,12 +143,13 @@ create_raw_image() {
 
 install_bootloader() {
   local _device="${1}"
-  # PARTUUID=$(fdisk -l $IMAGE_CONTEXT/$IMAGE_NAME |grep "Disk identifier" |awk -F "0x" '{ print $2}')
-  # echo $PARTUUID
+  local _partition="${2}"
+  PARTUUID=$(blkid "${_partition}" -o value -s UUID)
   #  NOTE:  The below line allows you to get terminal output when using qemu-system-x86_64 -serial stdio <image>
   #  linux $(hab pkg path ${HAB_KERNEL})/boot/bzImage quiet root=/dev/sda1 rw console=ttyAMA0  console=ttyS0
   cat <<EOB  > ${PWD}/boot/grub/grub.cfg 
-linux $(hab pkg path ${HAB_KERNEL})/boot/bzImage quiet root=/dev/sda1 rw 
+linux $(hab pkg path ${HAB_KERNEL})/boot/bzImage quiet root=UUID=$PARTUUID rw console=ttyAMA0 console=ttyS0
+initrd /boot/initrd.img-$(kernel_version $HAB_KERNEL)
 boot
 EOB
 
@@ -132,13 +157,14 @@ EOB
 }
 
 program=$(basename $0)
+program_files_path=$(dirname $0)/../files
 
 find_system_commands
 
-HAB_KERNEL="${HAB_KERNEL:-core/linux}"
+HAB_KERNEL="${HAB_KERNEL:-smacfarlane/linux}"
 HAB_SYSTEM="${HAB_SYSTEM:-${HAB_ORIGIN}/hab-image-system}"
 HAB_BOOT="${HAB_BOOT:-core/grub}"
-HAB_IMAGE_SIZE="${HAB_IMAGE_SIZE:-512}"
+HAB_IMAGE_SIZE="${HAB_IMAGE_SIZE:-1024}"
 PKGS=($@)
 
 IMAGE_NAME="${1//\//-}"  # Turns core/redis into core-redis

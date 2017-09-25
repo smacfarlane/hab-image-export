@@ -6,12 +6,12 @@
 # _pkgpath_for "core/redis"
 # ```
 _pkgpath_for() {
-  hab pkg path $1 | $bb sed -e "s,^$IMAGE_ROOT_FULLPATH,,g"
+  hab pkg path $1
 }
 
 
 create_filesystem_layout() {
-  mkdir -p {bin,sbin,boot,dev,etc,home,lib,mnt,opt,proc,srv,sys}
+  mkdir -p {bin,sbin,boot,dev,etc,home,lib,mnt,opt,proc,run,srv,sys}
   mkdir -p boot/grub
   mkdir -p usr/{sbin,bin,include,lib,share,src}
   mkdir -p var/{lib,lock,log,run,spool}
@@ -26,11 +26,28 @@ create_filesystem_layout() {
   hab pkg binlink core/busybox-static sh -d ${PWD}/bin
   hab pkg binlink core/busybox-static init -d ${PWD}/sbin
   hab pkg binlink core/hab hab -d ${PWD}/bin
+  hab pkg binlink smacfarlane/kmod modprobe -d ${PWD}/sbin
+  hab pkg binlink smacfarlane/kmod modprobe -d ${PWD}/sbin
+  
+  # TODO: Rebuild kmod package with links available
+  # TODO: Ensure busybox modutils aren't in our path
+  for bin in {depmod,insmod,modprobe,lsmod}; do
+    if [[ -e ${PWD}/bin/${bin} ]]; then
+      rm ${PWD}/bin/${bin}
+    fi
+    if [[ -d ${PWD}/sbin/${bin} ]]; then
+      rm ${PWD}/sbin/${bin}
+    fi
 
-  link_bins
-  setup_root_ssh # TODO: Temporary hack, remove me
+    ln -s /bin/kmod ${PWD}/sbin/${bin}
+  done
+
+  mkdir -p /hab/svc/openssh 
+  echo "port=22" >> /hab/svc/openssh/user.toml
 
   install -Dm744 ${program_files_path}/init ${PWD}/sbin/
+  install -Dm644 ${program_files_path}/mdev.conf ${PWD}/etc/
+  install -Dm644 ${program_files_path}/modules ${PWD}/etc/
 }
 
 setup_root_ssh() {
@@ -77,3 +94,5 @@ PACKAGES=($@)
 program_files_path=$(dirname $0)/../files
 
 create_filesystem_layout
+link_bins
+setup_root_ssh # TODO: Temporary hack, remove me
