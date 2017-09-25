@@ -1,6 +1,0 @@
-#!/bin/sh
-
-exec 2>&1
-
-exec dhclient -d -lf {{pkg.svc_var_path}}/db/dhclient.leases -pf {{pkg.svc_var_path}}/run/dhclient.pid
-
