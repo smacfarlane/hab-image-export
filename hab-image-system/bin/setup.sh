@@ -28,28 +28,32 @@ create_filesystem_layout() {
   hab pkg binlink core/hab hab -d ${PWD}/bin
 
   link_bins
-  setup_init
+  setup_root_ssh # TODO: Temporary hack, remove me
+
+  install -Dm744 ${program_files_path}/init ${PWD}/sbin/
 }
 
-setup_init() {
-  install -d -m 0755 etc/rc.d/dhcpcd 
-  install -d -m 0755 etc/rc.d/hab
-  install -Dm755 ${program_files_path}/udhcpc-run etc/rc.d/dhcpcd/run
-  install -Dm755 ${program_files_path}/hab etc/rc.d/hab/run
-
-  for pkg in ${PACKAGES[@]}; do 
-    echo "/bin/hab sup load ${pkg} --force" >> etc/rc.d/hab/run
-  done
-  echo "/bin/hab sup run " >> etc/rc.d/hab/run
+setup_root_ssh() {
+  mkdir -p root/.ssh
+  chmod 700 root/.ssh
+  if [[ -f ${program_files_path}/authorized_keys ]]; then
+    install -m 0600 ${program_files_path}/authorized_keys root/.ssh/authorized_keys
+  fi
 }
 
 link_bins_for() {
   local _pkg=$1
 
   if [[ -f "${_pkg}/PATH" && -f "${_pkg}/IDENT" ]]; then
+    local ident=$(cat ${_pkg}/IDENT)
+    # Launcher has a unique PATH, skip it
+    if [[ -z "${ident##core/hab-launcher/*}" ]]; then
+      echo "Not linking the launcher" 
+      continue
+    fi
+
     for path in $(cat "${_pkg}/PATH"| tr ":" "\n"); do  
-      local bindir=$(basename $path);
-      local ident=$(cat ${_pkg}/IDENT)
+      local bindir=$(basename $path); 
       mkdir -p /usr/${bindir} 
       for bin in $path/*; do 
         hab pkg binlink $ident "$(basename $bin)" -d ${PWD}/usr/"${bindir}" 
@@ -61,8 +65,8 @@ link_bins_for() {
 link_bins() {
   local _pkgpath=$(dirname $0)/..
   
-  if [[ -f "${_pkgpath}/TDEPS" ]]; then 
-    for dep in $(cat "${_pkgpath}/TDEPS"); do
+  if [[ -f "${_pkgpath}/DEPS" ]]; then 
+    for dep in $(cat "${_pkgpath}/DEPS"); do
       local _deppath=$(_pkgpath_for $dep)
       link_bins_for $_deppath
     done
@@ -73,4 +77,3 @@ PACKAGES=($@)
 program_files_path=$(dirname $0)/../files
 
 create_filesystem_layout
-setup_init
