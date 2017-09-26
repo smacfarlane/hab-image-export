@@ -1,0 +1,117 @@
+#!/bin/busybox sh
+#
+# This file based heavily on http://www.linuxfromscratch.org/blfs/view/svn/postlfs/initramfs.html
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+export PATH
+
+bb=/bin/busybox
+export bb
+
+problem()
+{
+   printf "Encountered a problem!\n\nDropping you to a shell.\n\n"
+   $bb sh
+}
+
+no_device()
+{
+   printf "The device %s, which is supposed to contain the\n" $1
+   printf "root file system, does not exist.\n"
+   printf "Please fix this problem and exit this shell.\n\n"
+}
+
+no_mount()
+{
+   printf "Could not mount device %s\n" $1
+   printf "Sleeping forever. Please reboot and fix the kernel command line.\n\n"
+   printf "Maybe the device is formatted with an unsupported file system?\n\n"
+   printf "Or maybe filesystem type autodetection went wrong, in which case\n"
+   printf "you should add the rootfstype=... parameter to the kernel command line.\n\n"
+   printf "Available partitions:\n"
+}
+
+do_mount_root()
+{
+   $bb mkdir /.root
+   [ -n "$rootflags" ] && rootflags="$rootflags,"
+   rootflags="$rootflags$ro"
+   rootdev=$($bb findfs $root)
+
+   case "$root" in
+      /dev/* ) device=$root ;;
+      UUID=* ) 
+        eval $root
+        [[ -b "$rootdev" ]] || problem
+        $bb mkdir -p /dev/disk/by-uuid
+        [[ ! -e /dev/disk/by-uuid/$UUID ]] && $bb ln -s $rootdev /dev/disk/by-uuid/$UUID
+        device="/dev/disk/by-uuid/$UUID" 
+        ;;
+      LABEL=*) 
+        eval $root
+        [[ -b "$rootdev" ]] || problem
+        $bb mkdir -p /dev/disk/by-label
+        [[ ! -e /dev/disk/by-label/$LABEL ]] && $bb ln -s $rootdev /dev/disk/by-label/$LABEL
+        device="/dev/disk/by-label/$LABEL" 
+        ;;
+      ""     ) echo "No root device specified." ; problem    ;;
+   esac
+
+   while [ ! -b "$device" ] ; do
+       no_device $device
+       problem
+   done
+
+   if ! $bb mount -n -t "$rootfstype" -o "$rootflags" "$device" /.root ; then
+       no_mount $device
+       $bb cat /proc/partitions
+       while true ; do $bb sleep 10000 ; done
+   else
+       echo "Successfully mounted device $root"
+   fi
+}
+
+init=/sbin/init
+root=
+rootdelay=
+rootfstype=auto
+ro="ro"
+rootflags=
+device=
+
+$bb mount -n -t devtmpfs devtmpfs /dev
+$bb mount -n -t proc     proc     /proc
+$bb mount -n -t sysfs    sysfs    /sys
+$bb mount -n -t tmpfs    tmpfs    /run
+$bb touch /dev/mdev.log 
+
+read -r cmdline < /proc/cmdline
+
+for param in $cmdline ; do
+  case $param in
+    init=*      ) init=${param#init=}             ;;
+    root=*      ) root=${param#root=}             ;;
+    rootdelay=* ) rootdelay=${param#rootdelay=}   ;;
+    rootfstype=*) rootfstype=${param#rootfstype=} ;;
+    rootflags=* ) rootflags=${param#rootflags=}   ;;
+    ro          ) ro="ro"                         ;;
+    rw          ) ro="rw"                         ;;
+  esac
+done
+
+if [ -f /etc/modules ] ; then
+	$bb sed 's/\#.*//g' < /etc/modules |
+	while read module args; do
+		$bb modprobe -q $module $args
+	done
+fi
+
+echo $bb mdev > /proc/sys/kernel/hotplug
+$bb mdev -s 
+
+# if [ -f /etc/mdadm.conf ] ; then mdadm -As                       ; fi
+# if [ -x /sbin/vgchange  ] ; then /sbin/vgchange -a y > /dev/null ; fi
+if [ -n "$rootdelay"    ] ; then $bb sleep "$rootdelay"              ; fi
+
+do_mount_root
+
+exec $bb switch_root /.root "$init" "$@"

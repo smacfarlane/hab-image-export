@@ -21,5 +21,11 @@ export_vmdk() {
   fi
 }
 
+cleanup_mounts() {
+  umount /tmp/hab-pkg-image*/hab-image-root
+  losetup -D
+  rm -rf /tmp/hab-pkg-image*
+}
+
 hab pkg install core/qemu
 

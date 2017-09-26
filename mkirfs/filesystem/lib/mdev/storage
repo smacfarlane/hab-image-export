@@ -1,0 +1,24 @@
+#!/bin/sh
+
+bb=/bin/busybox
+
+# Create symlinks to /dev/disk/by-uuid
+create_symlink() {
+  local UUID LABEL target
+
+  target="/dev/disk/by-uuid"
+  blockid=$($bb blkid $MDEV)
+  eval "${blockid#*: }"
+
+  [[ -e "${target}/${UUID}" ]] && return
+
+  mkdir -p "${target}"
+  ln -s "/dev/${MDEV}" "${target}/${UUID}"
+}
+
+
+case "${ACTION}" in 
+  'add') 
+    create_symlink
+    ;;
+esac

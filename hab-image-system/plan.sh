@@ -9,6 +9,7 @@ pkg_deps=(
   core/util-linux
   core/coreutils
   core/hab
+  smacfarlane/kmod
 )
 pkg_bin_dirs=(bin)
 

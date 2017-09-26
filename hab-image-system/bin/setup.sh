@@ -6,12 +6,12 @@
 # _pkgpath_for "core/redis"
 # ```
 _pkgpath_for() {
-  hab pkg path $1 | $bb sed -e "s,^$IMAGE_ROOT_FULLPATH,,g"
+  hab pkg path $1
 }
 
 
 create_filesystem_layout() {
-  mkdir -p {bin,sbin,boot,dev,etc,home,lib,mnt,opt,proc,srv,sys}
+  mkdir -p {bin,sbin,boot,dev,etc,home,lib,mnt,opt,proc,run,srv,sys}
   mkdir -p boot/grub
   mkdir -p usr/{sbin,bin,include,lib,share,src}
   mkdir -p var/{lib,lock,log,run,spool}
@@ -26,30 +26,51 @@ create_filesystem_layout() {
   hab pkg binlink core/busybox-static sh -d ${PWD}/bin
   hab pkg binlink core/busybox-static init -d ${PWD}/sbin
   hab pkg binlink core/hab hab -d ${PWD}/bin
+  hab pkg binlink smacfarlane/kmod modprobe -d ${PWD}/sbin
+  hab pkg binlink smacfarlane/kmod modprobe -d ${PWD}/sbin
+  
+  # TODO: Rebuild kmod package with links available
+  # TODO: Ensure busybox modutils aren't in our path
+  for bin in {depmod,insmod,modprobe,lsmod}; do
+    if [[ -e ${PWD}/bin/${bin} ]]; then
+      rm ${PWD}/bin/${bin}
+    fi
+    if [[ -d ${PWD}/sbin/${bin} ]]; then
+      rm ${PWD}/sbin/${bin}
+    fi
 
-  link_bins
-  setup_init
+    ln -s /bin/kmod ${PWD}/sbin/${bin}
+  done
+
+  mkdir -p /hab/svc/openssh 
+  echo "port=22" >> /hab/svc/openssh/user.toml
+
+  install -Dm744 ${program_files_path}/init ${PWD}/sbin/
+  install -Dm644 ${program_files_path}/mdev.conf ${PWD}/etc/
+  install -Dm644 ${program_files_path}/modules ${PWD}/etc/
 }
 
-setup_init() {
-  install -d -m 0755 etc/rc.d/dhcpcd 
-  install -d -m 0755 etc/rc.d/hab
-  install -Dm755 ${program_files_path}/udhcpc-run etc/rc.d/dhcpcd/run
-  install -Dm755 ${program_files_path}/hab etc/rc.d/hab/run
-
-  for pkg in ${PACKAGES[@]}; do 
-    echo "/bin/hab sup load ${pkg} --force" >> etc/rc.d/hab/run
-  done
-  echo "/bin/hab sup run " >> etc/rc.d/hab/run
+setup_root_ssh() {
+  mkdir -p root/.ssh
+  chmod 700 root/.ssh
+  if [[ -f ${program_files_path}/authorized_keys ]]; then
+    install -m 0600 ${program_files_path}/authorized_keys root/.ssh/authorized_keys
+  fi
 }
 
 link_bins_for() {
   local _pkg=$1
 
   if [[ -f "${_pkg}/PATH" && -f "${_pkg}/IDENT" ]]; then
+    local ident=$(cat ${_pkg}/IDENT)
+    # Launcher has a unique PATH, skip it
+    if [[ -z "${ident##core/hab-launcher/*}" ]]; then
+      echo "Not linking the launcher" 
+      continue
+    fi
+
     for path in $(cat "${_pkg}/PATH"| tr ":" "\n"); do  
-      local bindir=$(basename $path);
-      local ident=$(cat ${_pkg}/IDENT)
+      local bindir=$(basename $path); 
       mkdir -p /usr/${bindir} 
       for bin in $path/*; do 
         hab pkg binlink $ident "$(basename $bin)" -d ${PWD}/usr/"${bindir}" 
@@ -61,8 +82,8 @@ link_bins_for() {
 link_bins() {
   local _pkgpath=$(dirname $0)/..
   
-  if [[ -f "${_pkgpath}/TDEPS" ]]; then 
-    for dep in $(cat "${_pkgpath}/TDEPS"); do
+  if [[ -f "${_pkgpath}/DEPS" ]]; then 
+    for dep in $(cat "${_pkgpath}/DEPS"); do
       local _deppath=$(_pkgpath_for $dep)
       link_bins_for $_deppath
     done
@@ -73,4 +94,5 @@ PACKAGES=($@)
 program_files_path=$(dirname $0)/../files
 
 create_filesystem_layout
-setup_init
+link_bins
+setup_root_ssh # TODO: Temporary hack, remove me
