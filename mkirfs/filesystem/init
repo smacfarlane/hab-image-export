@@ -1,5 +1,6 @@
 #!/bin/busybox sh
-
+#
+# This file based heavily on http://www.linuxfromscratch.org/blfs/view/svn/postlfs/initramfs.html
 PATH=/bin:/usr/bin:/sbin:/usr/sbin
 export PATH
 

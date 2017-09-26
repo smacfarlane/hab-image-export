@@ -4,7 +4,6 @@ export_raw() {
 }
 
 rebuild_all() {
-  build hab-mkinitramfs
   build hab-image-export
   build hab-image-system
 }

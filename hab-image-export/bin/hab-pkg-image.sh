@@ -120,7 +120,7 @@ create_raw_image() {
   env PKGS="${IMAGE_PKGS[*]}" NO_MOUNT=1 hab studio -r "${PWD}" -t bare new
   hab pkg exec "${HAB_SYSTEM}" setup.sh "${PKGS[*]}"
 
-  hab-mkinitramfs "${HAB_KERNEL}" "${IMAGE_ROOT_FULLPATH}/boot"
+  mkirfs "${HAB_KERNEL}" "${IMAGE_ROOT_FULLPATH}/boot"
 
   install_bootloader "${_loopback_dev}" "${_partition_loopback_dev}"
   kernel_path="$(hab pkg path ${HAB_KERNEL})"

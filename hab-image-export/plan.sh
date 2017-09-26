@@ -15,7 +15,7 @@ pkg_deps=(
   core/findutils
   core/gzip
   core/cpio
-  smacfarlane/hab-mkinitramfs
+  smacfarlane/mkirfs
   smacfarlane/kmod
 )
 pkg_bin_dirs=(bin)
